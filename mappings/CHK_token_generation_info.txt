@@ -1,0 +1,93 @@
+asset controller to express conditions such as the need for specific token issuers to agree to mint new tokens, or to forbid minting tokens after a certain slot
+
+Input:
+-----------
+pay.vkey
+pay.skey
+pay.addr
+policy.vkey
+policy.skey
+protocol.json
+
+
+Output:
+-----------
+policy.script
+policy.id
+
+--------------
+cardano-cli address build \
+--payment-verification-key-file pay.vkey \
+--out-file pay.addr \
+--mainnet
+
+cardano-cli query utxo --mainnet --mary-era --address addr1v9t8uven5dlsp974a6d4w84m89h5w890tw3xd97py76cxzgyxsmjg
+
+cardano-cli  query protocol-parameters --mainnet  --mary-era --out-file protocol.json
+
+cardano-cli address key-gen \
+--verification-key-file policy/policy.vkey \
+--signing-key-file policy/policy.skey
+
+touch policy/policy.script && echo "" > policy/policy.script 
+
+echo "{" >> policy/policy.script 
+echo "  \"keyHash\": \"$(cardano-cli address key-hash --payment-verification-key-file policy/policy.vkey)\"," >> policy/policy.script 
+echo "  \"type\": \"sig\"" >> policy/policy.script 
+echo "}" >> policy/policy.script 
+
+cardano-cli transaction policyid --script-file ./policy/policy.script
+
+cardano-cli transaction build-raw \
+--mary-era \
+--fee 0 \
+--tx-in 73aa89e01546d21edbc58c18530c149d9f941c32eb6c0c87f0024faedc1d979f#0 \
+--tx-out addr1v9t8uven5dlsp974a6d4w84m89h5w890tw3xd97py76cxzgyxsmjg+22000000+"1000000000 bc8a19ca68787c91b58014e07718ec98a9fcd21230f83ee2326f9c73.chkcoin" \
+--mint="1000000000 bc8a19ca68787c91b58014e07718ec98a9fcd21230f83ee2326f9c73.chkcoin" \
+--metadata-json-file chkcoin_info.json \
+--out-file matx.raw
+
+cardano-cli transaction calculate-min-fee \
+--tx-body-file matx.raw \
+--tx-in-count 1 \
+--tx-out-count 1 \
+--witness-count 2 \
+--mainnet \
+--protocol-params-file protocol.json
+
+cardano-cli transaction build-raw \
+--mary-era \
+--fee 185873 \
+--tx-in 73aa89e01546d21edbc58c18530c149d9f941c32eb6c0c87f0024faedc1d979f#0 \
+--tx-out addr1v9t8uven5dlsp974a6d4w84m89h5w890tw3xd97py76cxzgyxsmjg+21814127+"1000000000 bc8a19ca68787c91b58014e07718ec98a9fcd21230f83ee2326f9c73.chkcoin" \
+--mint="1000000000 bc8a19ca68787c91b58014e07718ec98a9fcd21230f83ee2326f9c73.chkcoin" \
+--metadata-json-file chkcoin_info.json \
+--out-file matx.raw
+
+cardano-cli transaction sign \
+--signing-key-file pay.skey \
+--signing-key-file policy/policy.skey \
+--script-file policy/policy.script \
+--mainnet \
+--tx-body-file matx.raw \
+--out-file matx.signed
+
+cardano-cli transaction submit --tx-file  matx.signed --mainnet
+
+cardano-metadata-submitter entry bc8a19ca68787c91b58014e07718ec98a9fcd21230f83ee2326f9c73 \
+  --name "CHK coin" \
+  --description "The currency of CardanoHK" \
+  --policy policy/policy.script \
+  --ticker "CHK" \
+  --url "https://www.cardanohk.org"
+
+cardano-metadata-submitter entry bc8a19ca68787c91b58014e07718ec98a9fcd21230f83ee2326f9c73 -a policy/policy.skey
+
+cardano-metadata-submitter entry bc8a19ca68787c91b58014e07718ec98a9fcd21230f83ee2326f9c73 --finalize
+
+cardano-metadata-submitter validate bc8a19ca68787c91b58014e07718ec98a9fcd21230f83ee2326f9c73.json
+
+--------------
+pay.addr: addr1v9t8uven5dlsp974a6d4w84m89h5w890tw3xd97py76cxzgyxsmjg
+policy ID: bc8a19ca68787c91b58014e07718ec98a9fcd21230f83ee2326f9c73
+fee: 185873 Lovelace
